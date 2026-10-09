@@ -1,23 +1,27 @@
-# Image Analysis
+# Docker-File-Optimization
 
 ## Dockerfile Production checklist
 
 | Checklist item | Status | How the [Dockerfile](Dockerfile) meets it |
 |---|---|---|
-| Intentional, pinned base image versions | ✅ | `node:24.21.0-alpine3.24`: exact Node and Alpine version, not `:latest`. |
+| Intentional, pinned base image versions | ✅ | `node:24.0.0-alpine`: exact Node version, not `:latest`. |
 | Minimal base images (slim, distroless, alpine) | ✅ | Alpine in both stages. |
 | Multi-stage builds, no build tools in prod | ✅ | `build` → `runtime`. npm, npx, corepack and yarn are deleted from the runtime stage. |
 | Non-root user set before CMD | ✅ | `USER node:node` (built-in user, UID 1000) before `CMD`. App files stay owned by root. |
 | No secrets in image layers or ENV | ✅ | `ENV` holds only runtime settings. Named `COPY` paths, no `COPY . .`. `.dockerignore` excludes `.env`, `.npmrc`, keys. |
 | HEALTHCHECK instruction defined | ✅ | `node src/healthcheck.js` calls `/healthz`. No curl or wget needed. |
 | Vulnerability scanning in CI pipeline | ✅ | Trivy gate in [CI](.github/workflows/docker-build-scan.yml). Runs on every push to `main`. |
-| `.dockerignore` committed to repo | ⚠️ | [.dockerignore](.dockerignore) exists. It still needs to be committed. |
+| `.dockerignore` committed to repo | ✅ | [.dockerignore](.dockerignore) exists and has been committed |
 | Containers treated as disposable | ✅ | No SSH, read-only app code, stateless, exec-form `CMD` with `STOPSIGNAL SIGTERM` for a clean shutdown. |
 
 
 ## 1. Estimated image size reduction vs `FROM node:latest`
 
-`node:latest` is built on full Debian with compilers, Python, git and curl, which makes it about 1.2 GB. Switching to an Alpine base brings the image down to about 150 MB, which is roughly 88% smaller. Deleting npm, npx, corepack and yarn from the runtime stage, removing devDependencies with `npm prune --omit=dev`, and using a `.dockerignore` to keep `.git`, tests and the local `node_modules` out of the build make it smaller still.
+`node:latest` is built on full Debian with compilers, Python, git and curl, which makes it about 1.2 GB. Switching to an Alpine base brings the final image down to 166 MB, which is about 86% smaller. Removing devDependencies with `npm prune --omit=dev` and using a `.dockerignore` to keep `.git`, tests and the local `node_modules` out of the build keep the app layers small, so the final image is only 9 MB bigger than the base image.
+
+The pipeline prints the base and final image sizes on every run:
+
+![Base image size vs final image size](images/base-image-size.png)
 
 ## 2. How the multi-stage build reduces the attack surface
 
@@ -33,6 +37,10 @@ Containers share the host's kernel and run as root by default. If an attacker br
 ## 4. How to scan this image in CI
 
 Use a Trivy scanner on every pull_request/push that checks every package in the image against public CVE databases. Running it in CI makes it a gate, to prevent the image from being deployed to your environment. a vulnerable image is never pushed. It can also be setup to scan images, daily, weekly, or regularly to catch newly published CVEs.
+
+The Trivy scan in the pipeline found no vulnerabilities in the app's packages (`0` = clean):
+
+![Trivy scan results](images/trivy-scan.png)
 
 ## 5. Handling a CVE in the base image with no fix available
 
