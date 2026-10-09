@@ -1,0 +1,60 @@
+name: Build and scan image
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: docker-file-optimization:${{ github.sha }}
+  TRIVY_IMAGE: aquasec/trivy:0.75.0
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Unit tests
+        run: |
+          npm ci
+          npm test
+
+      - name: Lint Dockerfile (hadolint)
+        run: docker run --rm -i hadolint/hadolint:v2.12.0 < Dockerfile
+
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: Show base image size
+        run: |
+          base=$(grep -iE '^FROM ' Dockerfile | tail -n 1 | awk '{print $2}')
+          docker pull -q "$base" > /dev/null
+          base_mb=$(docker image inspect "$base" --format '{{.Size}}' | awk '{printf "%.0f", $1/1024/1024}')
+          final_mb=$(docker image inspect "$IMAGE" --format '{{.Size}}' | awk '{printf "%.0f", $1/1024/1024}')
+          echo "Base image:  $base"
+          echo "Base size:   ${base_mb} MB"
+          echo "Final size:  ${final_mb} MB"
+
+      - name: Verify image runs as non-root
+        run: |
+          user=$(docker image inspect "$IMAGE" --format '{{.Config.User}}')
+          echo "Configured user: $user"
+          test "$user" = "node:node"
+
+      - name: Scan image with Trivy
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            "$TRIVY_IMAGE" image \
+              --scanners vuln,secret,misconfig \
+              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --exit-code 1 \
+              "$IMAGE"

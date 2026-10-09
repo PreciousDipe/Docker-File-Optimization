@@ -1,0 +1,20 @@
+{
+  "name": "docker-file-optimization",
+  "version": "1.0.0",
+  "description": "Sample Node.js web app packaged with a hardened, minimal Docker image",
+  "main": "src/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}
