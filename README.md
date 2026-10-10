@@ -2,17 +2,17 @@
 
 ## Dockerfile Production checklist
 
-| Checklist item | Status | How the [Dockerfile](Dockerfile) meets it |
-|---|---|---|
-| Intentional, pinned base image versions | ✅ | `node:24.0.0-alpine`: exact Node version, not `:latest`. |
-| Minimal base images (slim, distroless, alpine) | ✅ | Alpine in both stages. |
-| Multi-stage builds, no build tools in prod | ✅ | `build` → `runtime`. npm, npx, corepack and yarn are deleted from the runtime stage. |
-| Non-root user set before CMD | ✅ | `USER node:node` (built-in user, UID 1000) before `CMD`. App files stay owned by root. |
-| No secrets in image layers or ENV | ✅ | `ENV` holds only runtime settings. Named `COPY` paths, no `COPY . .`. `.dockerignore` excludes `.env`, `.npmrc`, keys. |
-| HEALTHCHECK instruction defined | ✅ | `node src/healthcheck.js` calls `/healthz`. No curl or wget needed. |
-| Vulnerability scanning in CI pipeline | ✅ | Trivy gate in [CI](.github/workflows/docker-build-scan.yml). Runs on every push to `main`. |
-| `.dockerignore` committed to repo | ✅ | [.dockerignore](.dockerignore) exists and has been committed |
-| Containers treated as disposable | ✅ | No SSH, read-only app code, stateless, exec-form `CMD` with `STOPSIGNAL SIGTERM` for a clean shutdown. |
+| Checklist item | How the [Dockerfile](Dockerfile) meets it |
+|---|---|
+| Intentional, pinned base image versions | `node:24.0.0-alpine`: exact Node version, not `:latest`. |
+| Minimal base images (slim, distroless, alpine) | Alpine in both stages. |
+| Multi-stage builds, no build tools in prod | `build` → `runtime`. npm, npx, corepack and yarn are deleted from the runtime stage. |
+| Non-root user set before CMD | `USER node:node` (built-in user) before `CMD`. App files stay owned by root. |
+| No secrets in image layers or ENV | `ENV` holds only runtime settings. Named `COPY` paths, no `COPY . .`. `.dockerignore` excludes `.env`, `.npmrc`, keys. |
+| HEALTHCHECK instruction defined | `node src/healthcheck.js` calls `/healthz`. No curl or wget needed. |
+| Vulnerability scanning in CI pipeline | Trivy gate in [CI](.github/workflows/docker-build-scan.yml). Runs on every push to `main`. |
+| `.dockerignore` committed to repo | [.dockerignore](.dockerignore) exists and has been committed |
+| Containers treated as disposable | No SSH, read-only app code, stateless, exec-form `CMD` with `STOPSIGNAL SIGTERM` for a clean shutdown. |
 
 
 ## 1. Estimated image size reduction vs `FROM node:latest`
